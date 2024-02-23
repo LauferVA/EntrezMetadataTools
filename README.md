@@ -10,6 +10,8 @@ Will pull IDs and metadata for 3M records in >2hrs with low overhead, **serially
 At present there are 5 planned improvements to these functions, see the Issues posted on 2/22/2024.
 
 ProcessEntrezMetadata.py3: 
-Explodes the xml into an expanded tab delimited format.
+- Explodes the xml into an expanded tab delimited format.
+- currently this is post-hoc (after data download and processing)
+- once this works, integrate into ObtainEntrezMetadata.py3 and remove
 
 
