@@ -1,91 +1,55 @@
-import csv
-import xml.etree.ElementTree as ET
-from Bio import Entrez
-import json
-import logging
-import time
-import pandas as pd
-import numpy as np
+# import packages needed for file I/O
 import os
 import subprocess
+import csv
+import json
 
-# Set up logging
-logging.basicConfig(filename='entrez_errors.log', level=logging.ERROR, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# import packages for data storage in memory
+import pandas as pd
+import numpy as np
 
-with open('../EntrezCredentials.txt', 'r') as UserData:
-    EntrezInfo = UserData.readline().split()
-    Entrez.email = EntrezInfo[0]
-    Entrez.api_key = EntrezInfo[1]
-    Entrez.tool = EntrezInfo[2]
+# import packages needed to parallelize
+import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# error handling
+from urllib.error import HTTPError
+
+# import Bio and XML parsing packages to actually do the work
+from Bio import Entrez
+import xml.etree.ElementTree as ET
+
+# Define the function needed by this workflow.
+def get_worker_count(api_key):
+    """As per https://www.ncbi.nlm.nih.gov/books/NBK25497/"""
+    return 9 if api_key else 3
 
 def check_and_write_output_file(output_file, record, total_records):
-    """
-    Checks if the output file already has the expected number of records.
-    Writes to the file only if the existing number of records is less than total_records.
-    """
-    # Check if the file exists and has the expected number of lines/records
+    """Check and write output file if needed."""
     if os.path.exists(output_file):
         with open(output_file, "r") as file:
             lines = file.readlines()
-            # Assuming each record is written in a separate line
-            if len(lines) >= total_records: 
+            if len(lines) >= total_records:
                 print(f"File {output_file} already has the expected number of records or more.")
-                return False  # Indicates no need to write again
-    # If file does not exist or has fewer records, proceed to write
+                return False
     with open(output_file, "a") as file:
         file.write(json.dumps(record, indent=2))
-        file.write("\n\n")  # Add spacing between entries for readability
-    return True  # Indicates that writing was performed
+        file.write("\n\n")
+    return True
 
 def clean_and_write_df(df, output_file_path, threshold_percentage=5):
-    """
-    Removes columns with non-null row less than % threshold from DF; writes the cleaned DF to output_file_path.
-    - df: The pandas DataFrame to clean and write.
-    - output_file_path: Path to the output tab-delimited file.
-    - threshold_percentage: Minimum percentage of non-null entries required to keep a column.
-    """
-    df = df.replace("", np.nan)     # Replace empty strings with NaN to treat them as missing values
-    percentage_non_null = df.notnull().mean() * 100 # Calculate the percentage of non-null entries for each column
-#
-    columns_to_drop = percentage_non_null[percentage_non_null < threshold_percentage].index      # Identify columns with % non-null entries < the threshold
-    df_cleaned = df.drop(columns=columns_to_drop)     # Drop these columns from the DataFrame
-    df_cleaned.to_csv(output_file_path, sep='\t', index=False)     # Write the cleaned DataFrame to a tab-delimited file
+    """Clean and write DataFrame to file."""
+    df = df.replace("", np.nan)
+    percentage_non_null = df.notnull().mean() * 100
+    columns_to_drop = percentage_non_null[percentage_non_null < threshold_percentage].index
+    df_cleaned = df.drop(columns=columns_to_drop)
+    df_cleaned.to_csv(output_file_path, sep='\t', index=False)
     print(f"Cleaned DataFrame written to {output_file_path}. Dropped columns: {list(columns_to_drop)}")
+    return df_cleaned
 
-    return df
-
-# def parse_xml_to_dict(xml_string):
-#     try:
-#         # Parse the XML string
-#         root = ET.fromstring(xml_string)
-#         # Initialize a dictionary to hold the parsed data
-#         parsed_data = {}
-#         # Iterate through all elements in the XML
-#         for element in root.iter():
-#             # Use the element tag as the key and the element text as the value
-#             # If the element has attributes, add them as keys with their respective values
-#             if element.text:
-#                 parsed_data[element.tag] = element.text.strip()
-#             for name, value in element.attrib.items():
-#                 parsed_data[name] = value
-#         return parsed_data
-#     except ET.ParseError:
-#         return {}  # Return an empty dictionary if parsing fails
-
-# def parse_xml_columns(df):
-#     for column in df.columns:
-#         # Check if the column content looks like XML (e.g., starts with '<' and ends with '>')
-#         if df[column].dtype == object and df[column].str.startswith('<').all():
-#             # Parse the XML content in the column
-#             parsed_columns = df[column].apply(parse_xml_to_dict).apply(pd.Series)
-#             # Drop the original XML column
-#             df = df.drop(column, axis=1)
-#             # Concatenate the parsed columns to the original DataFrame
-#             df = pd.concat([df, parsed_columns], axis=1)
-#     return df
-
-def fetch_ids_in_batches_and_write_record(db, term, batch_size=10000):
-    print(f"attempting to fetch IDs from {db}.")
+def fetch_ids(db, term, batch_size=10000):
+    print(f"Attempting to fetch IDs from {db}.")
     handle = Entrez.esearch(db=db, term=term, retmax=0)
     record = Entrez.read(handle)
     total_records = int(record["Count"])
@@ -98,69 +62,94 @@ def fetch_ids_in_batches_and_write_record(db, term, batch_size=10000):
         ids.extend(record["IdList"])
         handle.close()
 
-        # Before writing, check if the output file already meets the expected record count
-        if not check_and_write_output_file(output_file, record, total_records):
-            break  # Skip writing if the file already has the expected number of records or more
-
-    print(f"done fetching {db} IDs")
+    print(f"Done fetching {db} IDs")
     return ids
 
-
-def fetch_summaries_in_batches_to_df(db, id_list, batch_size=10000, max_batches_per_cycle=25):
-    total_batches = (len(id_list) - 1) // batch_size + 1
-    cycles = (total_batches - 1) // max_batches_per_cycle + 1
-    
-    for cycle in range(cycles):
-        print(f"Starting cycle {cycle + 1} of {cycles}")
-        all_summaries = []  # Reinitialize for each cycle
-        
-        batch_start = cycle * max_batches_per_cycle
-        batch_end = min((cycle + 1) * max_batches_per_cycle, total_batches)
-        
-        for batch_index in range(batch_start, batch_end):
-            start = batch_index * batch_size
-            batch_ids = id_list[start:start + batch_size]
-            handle = Entrez.esummary(db=db, id=",".join(batch_ids))
-            summaries = Entrez.read(handle, validate=False)
+def fetch_summary_batch(db, id_list, retries=5, backoff=1.5):
+    """Fetch a batch of summaries from NCBI Entrez database with error handling."""
+    attempt = 0
+    while attempt < retries:
+        try:
+            handle = Entrez.esummary(db=db, id=",".join(id_list))
+            records = Entrez.read(handle)
             handle.close()
+            return records
+        except HTTPError as e:
+            print(f"HTTP Error encountered: {e.code} {e.reason}. Attempt {attempt+1} of {retries}.")
+            time.sleep(backoff ** attempt)  # Exponential backoff
+            attempt += 1
+        except Exception as e:
+            print(f"An error occurred: {e}. Attempt {attempt+1} of {retries}.")
+            time.sleep(backoff ** attempt)  # Exponential backoff
+            attempt += 1
+    raise Exception(f"Failed to fetch summaries after {retries} attempts.")
 
-            if 'DocumentSummarySet' in summaries:
-                all_summaries.extend(summaries['DocumentSummarySet']['DocumentSummary'])
-            else:
-                all_summaries.extend(summaries)
+def dump_dataframe_to_file(df):
+    """Dump the DataFrame to a CSV file."""
+    global current_file_index
+    current_file_index += 1
+    file_name = f'summary_batch_{current_file_index}.csv'
+    df.to_csv(file_name, index=False)
+    print(f"Dumped {len(df)} records to {file_name}.")
 
-            print(f"Processed batch {batch_index + 1} of {total_batches} in cycle {cycle + 1}")
-            
-        df = pd.DataFrame(all_summaries)
-#        df = parse_xml_columns(df)  # Here, insert the new function to check and parse XML-like content
-        output_file_path = f"../Data/{db}_metadata_cycle_{cycle + 1}.tsv"
-        df_cleaned = clean_and_write_df(df, output_file_path, threshold_percentage=5)
+def parallel_fetch_summaries(db, id_list, batch_size=10000):
+    """Fetch summaries in parallel and manage dumping to files at specified thresholds."""
+    global records_processed
+    worker_count = get_worker_count(Entrez.api_key)
+    batches = [id_list[i:i + batch_size] for i in range(0, len(id_list), batch_size)]
+    params = [(db, batch) for batch in batches]
 
-        print(f"Cycle {cycle + 1} completed. Data written to {output_file_path}.")
+    df_accumulator = pd.DataFrame()  # Initialize an empty DataFrame to accumulate fetched summaries
 
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        future_to_batch = {executor.submit(fetch_summary_batch, db, batch): batch for batch in batches}
+        for future in as_completed(future_to_batch):
+            records = future.result()
+            df_batch = pd.DataFrame(records)  # Convert list of dictionaries to DataFrame
+            df_accumulator = pd.concat([df_accumulator, df_batch], ignore_index=True)
+            records_processed += len(df_batch)
 
+            # Check if the threshold is reached to dump data to file and reset DataFrame
+            if records_processed >= dump_threshold:
+                dump_dataframe_to_file(df_accumulator)
+                df_accumulator = pd.DataFrame()  # Reset DataFrame after dumping
+                records_processed = 0  # Reset records processed counter
 
-# Set search terms
-DbBioProject = "bioproject"; DbBioSample = "biosample"; DbSra='sra'
-query='("Homo sapiens"[Organism] OR "Mus musculus"[Organism]) AND RNA-Seq[All Fields]'
+    # Dump any remaining records that didn't meet the threshold
+    if not df_accumulator.empty:
+        dump_dataframe_to_file(df_accumulator)
 
-# Usage for BioProject
-BioProjectIds = fetch_ids_in_batches_and_write_record(DbBioProject, query, batch_size=10000)
-BioprojectDf = fetch_summaries_in_batches_to_df(DbBioProject, BioProjectIds)
+# Initialize global variables to manage the process
+current_file_index = 0          # To keep track of the file number being written
+records_processed = 0           # To track the number of records processed across batches
+batch_size = 10000              # Number of records pulled in an any single API call.
+dump_threshold = 100000         # Threshold to dump data to file
 
-# Usage for BioSample
-BioSampleIds = fetch_ids_in_batches_and_write_record(DbBioSample, query, batch_size=10000)
-BioSampleDf = fetch_summaries_in_batches_to_df(DbBioSample, BioSampleIds)
+# Main logic to use the functions
+def main():
+    # Set your Entrez email, tool, and api_key
+    # Define your databases and query
+    # Fetch IDs, summaries, and process data as needed
+    with open('../EntrezCredentials.txt', 'r') as UserData:
+        EntrezInfo = UserData.readline().split()
+        Entrez.email = EntrezInfo[0]
+        Entrez.tool = EntrezInfo[1]
+        Entrez.api_key = EntrezInfo[2]
 
-# Usage for Sra
-SraIds = fetch_ids_in_batches_and_write_record(DbSra, query, batch_size=10000)
-SraDf = fetch_summaries_in_batches_to_df(DbSra, SraIds)
+    # Set search terms
+    db = 'sra'
+    query = '("Homo sapiens"[Organism] OR "Mus musculus"[Organism]) AND RNA-Seq[All Fields]'
 
+    # Fetch IDs based on the query
+    id_list = fetch_ids(db, query)
 
-# Define the command to be executed
-command = "awk 'FNR==1 && NR!=1{next;}{print}' sra_metadata_cycle_{1..12}.tsv > sra_metadata.tsv"
+    # Fetch summaries in parallel and manage dumping to files
+    parallel_fetch_summaries(db, id_list, batch_size=10000)
 
-# Use the subprocess.run method to execute the command
-result = subprocess.run(command, shell=True, capture_output=True, text=True)
-print(result)
-
+if __name__ == "__main__":
+    # Configure logging
+    logging.basicConfig(filename='entrez_errors.log', level=logging.ERROR, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    try:
+        main()
+    except Exception as e:
+        logging.error("An error occurred during execution", exc_info=True)
