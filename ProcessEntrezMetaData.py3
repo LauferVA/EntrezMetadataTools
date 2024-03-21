@@ -83,3 +83,5 @@ folder_path = '../Data/'
 final_combined_df = process_all_files_in_folder(folder_path)
 del final_combined_df['Item']
 final_combined_df.to_excel('../Out/combined_sra_rnaseq_metadata.xlsx', index=False) # Save the combined DataFrame as an Excel file
+final_combined_df.to_csv(file_path, sep='\t', index=False) # can be helpful to save as flatfile instead ... example: Excel chokes after > 2^20 rows.
+
