@@ -16,10 +16,9 @@ def parse_xml_to_dict(xml_string):
     return xml_dict
 
 def process_xml_data(xml_row_data):
-    """ the purpose of this function is to handle cases in which the xml data is poorly formed and breaks standard xml parsers 
-    an initial attempt to parse the xml is made. if this fails, the index where the non-standard formatting (that caused the
-    error) is recorded.this index is then used to isolate a manageable section of the xml that can be parsed. this process is 
-    repeated as many times as is necessary until the xml data are fully parsed. """
+    """ handles cases in which the xml data are poorly formed and breaks standard xml parsers an initial attempt to parse the 
+    xml is made. if this fails, the index where the non-standard formatting (that caused the error) is recorded then used to 
+    isolate a manageable section of the xml. this process is repeated until the xml data are fully parsed. """
     final_xml_df = pd.DataFrame()
     xml_data = xml_row_data
     while xml_data:
@@ -39,22 +38,18 @@ def process_line_with_xml(row_data):
     """ shunts various parts of each row of the data being read in into a different processing routine """
     row_combined_data = {}
     non_xml_fields = [key for key, value in row_data.items() if not key.endswith('Xml')]
-    
-    # Copy non-XML fields
+
     for key in non_xml_fields:
-        row_combined_data[key] = row_data[key]
-    
-    # Process XML fields
+        row_combined_data[key] = row_data[key]     # Copy non-XML fields
     xml_fields = [key for key in row_data if key.endswith('Xml')]
     for xml_field in xml_fields:
-        xml_data = row_data.get(xml_field, '')
+        xml_data = row_data.get(xml_field, '')     # Process XML fields
         if xml_data:
             # Process XML column
             final_xml_df = process_xml_data(xml_data)
             if not final_xml_df.empty:
                 # Merge flattened XML data into combined data
                 row_combined_data.update(final_xml_df.iloc[0])
-    
     return row_combined_data
 
 def process_metadata_file_with_xml(file_path):
@@ -64,14 +59,14 @@ def process_metadata_file_with_xml(file_path):
     with open(file_path, mode='r', encoding='utf-8') as file:
         reader = csv.DictReader(file, delimiter=",")
         for row in reader:
-            row_combined_data = process_line_with_xml(row)        # Process each line with embedded XML
+            row_combined_data = process_line_with_xml(row)         # Process each line with embedded XML
             combined_data.append(row_combined_data)
-    final_df = pd.DataFrame(combined_data)     # Convert combined data to DataFrame
+    final_df = pd.DataFrame(combined_data)                         # Convert combined data to DataFrame
     return final_df
 
 def process_all_files_in_folder(folder_path):
-    """ get file names of all .tsv files in target dir; use to serially process stored metadata-containg flatfiles. as with
-    the above function, this function will be phased out once this script is integrated with ObtainEntrezMetadata.py3. """
+    """ get all .tsv fnames in target dir; serially process stored metadata-containg flatfiles. as with
+    process_metadata_file_with_xml(), will be phased out once this script is integrated with ObtainEntrezMetadata.py3. """
     dfs = []
     for filename in os.listdir(folder_path):
         if filename.endswith('.tsv'):
