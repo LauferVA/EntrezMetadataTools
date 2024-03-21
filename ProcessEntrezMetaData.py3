@@ -5,18 +5,23 @@ import os
 import csv
 
 def parse_xml_to_dict(xml_string):
-    soup = BeautifulSoup(xml_string, 'html.parser')  # Using html.parser as an alternative parser
+    """ convert XML to dict using beautiful soup """
+    soup = BeautifulSoup(xml_string, 'html.parser')  # lxml is default for bs4, but this selection more likely to work for varety of users (html.parser as an alternative parser).
     xml_dict = defaultdict(list)
-    for tag in soup.find_all(recursive=False):
+    for tag in soup.find_all(recursive=False): # iterate over tags
         if tag.string and tag.string.strip():
-            xml_dict[tag.name].append(tag.string.strip())
+            xml_dict[tag.name].append(tag.string.strip()) # extract the tags
         for attr_name, attr_value in tag.attrs.items():
-            xml_dict[f"{tag.name}@{attr_name}"].append(attr_value)
+            xml_dict[f"{tag.name}@{attr_name}"].append(attr_value) # extract the values of each tag.
     return xml_dict
 
-def process_xml_column(xml_column):
+def process_xml_data(xml_row_data):
+    """ the purpose of this function is to handle cases in which the xml data is poorly formed and breaks standard xml parsers 
+    an initial attempt to parse the xml is made. if this fails, the index where the non-standard formatting (that caused the
+    error) is recorded.this index is then used to isolate a manageable section of the xml that can be parsed. this process is 
+    repeated as many times as is necessary until the xml data are fully parsed. """
     final_xml_df = pd.DataFrame()
-    xml_data = xml_column
+    xml_data = xml_row_data
     while xml_data:
         try:
             xml_dict = parse_xml_to_dict(xml_data)
@@ -45,7 +50,7 @@ def process_line_with_xml(row_data):
         xml_data = row_data.get(xml_field, '')
         if xml_data:
             # Process XML column
-            final_xml_df = process_xml_column(xml_data)
+            final_xml_df = process_xml_data(xml_data)
             if not final_xml_df.empty:
                 # Merge flattened XML data into combined data
                 row_combined_data.update(final_xml_df.iloc[0])
