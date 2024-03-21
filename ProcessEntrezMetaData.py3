@@ -36,7 +36,7 @@ def process_xml_data(xml_row_data):
     return final_xml_df
 
 def process_line_with_xml(row_data):
-    # Initialize combined data
+    """ shunts various parts of each row of the data being read in into a different processing routine """
     row_combined_data = {}
     non_xml_fields = [key for key, value in row_data.items() if not key.endswith('Xml')]
     
