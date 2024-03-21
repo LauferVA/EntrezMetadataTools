@@ -1,44 +1,83 @@
 import pandas as pd
-import subprocess
+from bs4 import BeautifulSoup
+from collections import defaultdict
+import os
+import csv
 
+def parse_xml_to_dict(xml_string):
+    soup = BeautifulSoup(xml_string, 'html.parser')  # Using html.parser as an alternative parser
+    xml_dict = defaultdict(list)
+    for tag in soup.find_all(recursive=False):
+        if tag.string and tag.string.strip():
+            xml_dict[tag.name].append(tag.string.strip())
+        for attr_name, attr_value in tag.attrs.items():
+            xml_dict[f"{tag.name}@{attr_name}"].append(attr_value)
+    return xml_dict
 
-# input file paths
-dD='../Data/'
-SraMd=f"{dD}sra_metadata.tsv"
-BpMd=f"{dD}bioproject_metadata_cycle_1.tsv"
-BsMd=f"{dD}biosample_metadata_cycle_1.tsv"
+def process_xml_column(xml_column):
+    final_xml_df = pd.DataFrame()
+    xml_data = xml_column
+    while xml_data:
+        try:
+            xml_dict = parse_xml_to_dict(xml_data)
+            final_xml_df = pd.concat([final_xml_df, pd.DataFrame(xml_dict)], ignore_index=True)
+            break  # Process only the first chunk of XML data
+        except Exception as e:
+            error_message = str(e)
+            print(f"XML parsing error encountered: {error_message}")
+            # Find the position of the parsing error and truncate XML data
+            error_index = int(error_message.split(':')[-1].strip())
+            xml_data = xml_data[:error_index]
+    return final_xml_df
 
-# intermediate file paths
-SraMdTemp=f"{dD}sra_temp.tsv"
-BpMdTemp=f"{dD}bioproject_temp.tsv"
-BsMdTemp=f"{dD}biosample_temp.tsv"
+def process_line_with_xml(row_data):
+    # Initialize combined data
+    row_combined_data = {}
+    non_xml_fields = [key for key, value in row_data.items() if not key.endswith('Xml')]
+    
+    # Copy non-XML fields
+    for key in non_xml_fields:
+        row_combined_data[key] = row_data[key]
+    
+    # Process XML fields
+    xml_fields = [key for key in row_data if key.endswith('Xml')]
+    for xml_field in xml_fields:
+        xml_data = row_data.get(xml_field, '')
+        if xml_data:
+            # Process XML column
+            final_xml_df = process_xml_column(xml_data)
+            if not final_xml_df.empty:
+                # Merge flattened XML data into combined data
+                row_combined_data.update(final_xml_df.iloc[0])
+    
+    return row_combined_data
 
-# output file paths:
-SraMdOut=f"{dD}sra_metadata_proc.tsv"
-BpMdOut=f"{dD}bioproject_metadata_proc.tsv"
-BsMdOut=f"{dD}biosample_metadata_proc.tsv"
+def process_metadata_file_with_xml(file_path):
+    combined_data = []
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        reader = csv.DictReader(file, delimiter=",")
+        
+        # Process each line with embedded XML
+        for row in reader:
+            row_combined_data = process_line_with_xml(row)
+            combined_data.append(row_combined_data)
+    
+    # Convert combined data to DataFrame
+    final_df = pd.DataFrame(combined_data)
+    return final_df
 
-# Execute the awk command
-xml_column_index=10
-awk_cmd = f"awk -F'\\t' '{{print $xml_column_index}}' {BsMd} > {BsMdTemp}"
-subprocess.run(awk_cmd, shell=True, check=True)
+def process_all_files_in_folder(folder_path):
+    dfs = []
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.tsv'):
+            file_path = os.path.join(folder_path, filename)
+            df = process_metadata_file_with_xml(file_path)
+            dfs.append(df)
+    combined_df = pd.concat(dfs, ignore_index=True)
+    return combined_df
 
-
-def parse_xml(xml_string):
-    # Placeholder for the function that parses a single XML record
-    # and returns a dictionary of the data
-    pass
-
-# Define the output CSV file for the processed data
-processed_data_path = 'path/to/your/processed_data.csv'
-
-# Open the output file in append mode
-with open(processed_data_path, 'a') as output_file:
-    # Read the XML data line by line or in small batches
-    with open(output_xml_file_path, 'r') as xml_file:
-        for xml_record in xml_file:
-            # Parse the XML record
-            parsed_data = parse_xml(xml_record)
-            # Convert the parsed data to a DataFrame and write to the CSV file
-            df = pd.DataFrame([parsed_data])
-            df.to_csv(output_file, header=False, index=False)
+# Process all .tsv files in a folder
+folder_path = '../Data/'
+final_combined_df = process_all_files_in_folder(folder_path)
+del final_combined_df['Item']
+final_combined_df.to_excel('../Out/combined_sra_rnaseq_metadata.xlsx', index=False) # Save the combined DataFrame as an Excel file
