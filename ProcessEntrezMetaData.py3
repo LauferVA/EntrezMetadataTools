@@ -5,7 +5,8 @@ import os
 import csv
 
 def parse_xml_to_dict(xml_string):
-    """ convert XML to dict using beautiful soup """
+    """ convert XML to dict using beautiful soup. name dict keys using the XML element and subelement 
+    names in order to preserve knowledge of incoming XML """
     soup = BeautifulSoup(xml_string, 'html.parser')  # lxml is default for bs4, but this selection more likely to work for varety of users (html.parser as an alternative parser).
     xml_dict = defaultdict(list)
     for tag in soup.find_all(recursive=False): # iterate over tags
