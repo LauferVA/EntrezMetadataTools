@@ -58,20 +58,20 @@ def process_line_with_xml(row_data):
     return row_combined_data
 
 def process_metadata_file_with_xml(file_path):
+    """ at present, this script takes flat files created by ObtainEntrezMetadata.py3 as input via this function in the 
+    future, will process the xml at the same time as Md are obtained from Entrez, so this function will be unnecessary. """
     combined_data = []
     with open(file_path, mode='r', encoding='utf-8') as file:
         reader = csv.DictReader(file, delimiter=",")
-        
-        # Process each line with embedded XML
         for row in reader:
-            row_combined_data = process_line_with_xml(row)
+            row_combined_data = process_line_with_xml(row)        # Process each line with embedded XML
             combined_data.append(row_combined_data)
-    
-    # Convert combined data to DataFrame
-    final_df = pd.DataFrame(combined_data)
+    final_df = pd.DataFrame(combined_data)     # Convert combined data to DataFrame
     return final_df
 
 def process_all_files_in_folder(folder_path):
+    """ get file names of all .tsv files in target dir; use to serially process stored metadata-containg flatfiles. as with
+    the above function, this function will be phased out once this script is integrated with ObtainEntrezMetadata.py3. """
     dfs = []
     for filename in os.listdir(folder_path):
         if filename.endswith('.tsv'):
@@ -81,7 +81,7 @@ def process_all_files_in_folder(folder_path):
     combined_df = pd.concat(dfs, ignore_index=True)
     return combined_df
 
-# Process all .tsv files in a folder
+# actually set target file / folder paths. replace this with command line arguments or draw the info from flat file.
 folder_path = '../Data/'
 final_combined_df = process_all_files_in_folder(folder_path)
 del final_combined_df['Item']
