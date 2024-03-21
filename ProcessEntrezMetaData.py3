@@ -33,6 +33,7 @@ def process_xml_data(xml_row_data):
             # Find the position of the parsing error and truncate XML data
             error_index = int(error_message.split(':')[-1].strip())
             xml_data = xml_data[:error_index]
+    """ I recall adding recursion to this - need to enable serial flattening of nested structures using recursion. """
     return final_xml_df
 
 def process_line_with_xml(row_data):
