@@ -62,7 +62,7 @@ As examples of the above, consider:
 # import numpy as np
 
 # Create a DataFrame with 8 unique values in column 'A'
-""" Example Usage """
+`""" Example Usage """
 df = pd.DataFrame({
     'A': np.arange(1, 9),               # Unique values from 1 to 8 (bijective)
     'B': np.random.permutation(np.arange(1, 9)),  # A permutation of A (bijective)
@@ -73,7 +73,7 @@ df = pd.DataFrame({
     'G': np.arange(100, 108),            # Completely unique set (injective)
     'H': [1, 2, 3, 4, 5, 6, 7, 1]        # Duplicates but covers all A (surjective)
 })
-print(df)
+print(df)`
 
 Note that we identify relationships of this kind between all pairs of columns in order to achieve greater data compression through the creation of ancillary tables.
 
