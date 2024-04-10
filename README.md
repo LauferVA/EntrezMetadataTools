@@ -12,11 +12,6 @@ Capabilities:
     - XML parser capable of serial flattening of compound nested XML structures.
     - XML parser capable of handling broken / incorrect XML formatted files of certain kinds.
 
-2 tasks remain before versioning as 1.0:
-1. Add Data Integration across multiple queries run using ObtainEntrezMetadata.py3. This will be with IntegrateEntrezMetadata.py3.
-2. Add prioritization script to be able to deliver to Matt rank-ordered studies that are recommended.
-
-Once the script provides helpful prioritization of studies, version as 1.0.
 
 ############## Notes pertaining to Data Merging 
 
@@ -103,7 +98,11 @@ These elements help manage and maintain the consistency and accuracy of the data
 
 In this particular analysis, we identify surjective relationships, then remove col2, retaining col1, but we write only the unique relationships between col1 and col2.
 
+2 tasks remain before versioning as 1.0:
+1. Add Data Integration across multiple queries run using ObtainEntrezMetadata.py3. This will be with IntegrateEntrezMetadata.py3.
+2. Add prioritization script to be able to deliver to Matt rank-ordered studies that are recommended.
 
+Once the script provides helpful prioritization of studies, version as 1.0.
 
 
 
