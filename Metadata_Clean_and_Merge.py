@@ -43,22 +43,22 @@ def remove_identical_columns(df, df_copy):
 	return df, df_copy
 
 
-def identify_bijective_relationships(df):
+def identify_bijective_relationships(df_copy):
 	""" Step 1.5 - Identify columns that map onto one another in a one-to-one fashion, even if the strings differ."""
-	num_cols = len(df.columns)
+	num_cols = len(df_copy.columns)
 	cols_to_drop = []
 	mapping_tables = []
 
 	# Precompute unique value counts and non-null unique value counts for each column
-	unique_counts = {col: df[col].dropna().unique().size for col in df.columns}
-	unique_nunique_counts = {col: df[col].dropna().nunique() for col in df.columns}
+	unique_counts = {col: df_copy[col].dropna().unique().size for col in df_copy.columns}
+	unique_nunique_counts = {col: df_copy[col].dropna().nunique() for col in df_copy.columns}
 
 	for i in range(num_cols):
 		for j in range(i + 1, num_cols):
-			col_i_name = df.columns[i]
-			col_j_name = df.columns[j]
-			col_i = df.iloc[:, i].dropna()
-			col_j = df.iloc[:, j].dropna()
+			col_i_name = df_copy.columns[i]
+			col_j_name = df_copy.columns[j]
+			col_i = df_copy.iloc[:, i].dropna()
+			col_j = df_copy.iloc[:, j].dropna()
 
 			if (unique_counts[col_i_name] == unique_counts[col_j_name] ==
 				unique_nunique_counts[col_i_name] == unique_nunique_counts[col_j_name] and
@@ -69,30 +69,29 @@ def identify_bijective_relationships(df):
 					col_j_name: pd.Series(col_i.unique()).map(pd.Series(col_j.unique(), index=col_i.unique())).values
 				})
 				mapping_tables.append(mapping_table)
-
 	return cols_to_drop, mapping_tables
 
-def Surjective_Cols_To_LookUp_Table(df, colToKeep, colToDrop):
+def surjective_cols_to_lookup_table(df, df_copy, colToKeep, colToDrop):
 	""" Step 1.6 - Following identification of a surjective relationship, this function will write the one-to-one 
 	correspondence to a separate DataFrame and update the original DataFrame by dropping one column."""
-	new_df = df[[colToKeep, colToDrop]]  # Create a new DF with only the two specified columns
-	new_df = new_df.dropna().drop_duplicates()  # Remove NaN values and drop duplicates from the new DataFrame
-	modified_df = df.drop(columns=[colToDrop])  # Drop the specified column to drop from the original DataFrame
-	return modified_df, new_df  # Return both the modified original DataFrame and the new DataFrame
+	lookup_df = df[[colToKeep, colToDrop]]       # Create a new DF with only the two specified columns
+	df_copy = df_copy.dropna().drop_duplicates() # Remove NaN values and drop duplicates from the new DataFrame
+	df_copy = df_copy.drop(columns=[colToDrop])  # Drop the specified column to drop from the original DataFrame
+	df = df.drop(columns=[colToDrop])            # Now finally drop the specified columns to drop from the **original** DataFrame
+	return df, df_copy, lookup_df                # Return both the modified original DataFrame and the new DataFrame
 
-def manage_bijective_and_lookup(df):
-	""" Steps 1.5 and 1.6 - Manage bijective relationships and create lookup tables"""
-	modified_df = df.copy()
-	dropped_columns, mapping_tables = identify_bijective_relationships(df)
+def manage_bijective_and_lookup(df, df_copy):
+	""" Steps 1.5 and 1.6 - Manage bijective relationships and create lookup tables """
+	dropped_columns, mapping_tables = identify_bijective_relationships(df_copy)
 	for table in mapping_tables:
 		colToKeep, colToDrop = table.columns[0], table.columns[1]
-		modified_df, new_lookup_table = Surjective_Cols_To_LookUp_Table(modified_df, colToKeep, colToDrop)
+		df, df_copy, new_lookup_table = surjective_cols_to_lookup_table(df, df_copy, colToKeep, colToDrop)
 		print(f"Lookup table created for {colToKeep} and {colToDrop}")
 		print(new_lookup_table.head())  # Display a preview of the lookup table
-	return modified_df
+	return df
 
 def remove_substrings_from_colnames(df, threshold_percentage=0.20):
-	# Split column names and count occurrences of each part
+	""" Split column names and count occurrences of each part """
 	col_names = df.columns.tolist()
 	parts_list = [name.split('_') for name in col_names]
 	flat_list = [part for sublist in parts_list for part in sublist]
@@ -100,8 +99,7 @@ def remove_substrings_from_colnames(df, threshold_percentage=0.20):
 	threshold = len(col_names) * threshold_percentage / 100 # Calculate the threshold for removing a part
 
 	# Find parts that are common across more than the threshold and lead a column name
-	common_leading_parts = {part for part, count in part_counts.items() if count > threshold and
-							any(name.startswith(part + '_') for name in col_names)}
+	common_leading_parts = {part for part, count in part_counts.items() if count > threshold and any(name.startswith(part + '_') for name in col_names)}
 
 	# Remove the common leading parts from the column names
 	new_col_names = []
@@ -153,7 +151,7 @@ def main(infile, outfile_stem):
 	df, df_copy = remove_identical_columns(df, df_copy)  # Step 1.3
 	primary_keys = identify_primary_key_candidates(df)  # Step 1.4
 	print("Primary Key Candidates:", primary_keys)
-	final_df = manage_bijective_and_lookup(df)  # Step 1.5 and 1.6
+	final_df = manage_bijective_and_lookup(df, df_copy)  # Step 1.5 and 1.6
 	write_outfiles(final_df, outfile_stem)
 
 	return final_df
@@ -163,4 +161,7 @@ if __name__ == "__main__":
 	if len(sys.argv) > 1:
 		main(sys.argv[1])  # Pass the input file as an argument
 	else:
-		main('../Data/proc/bioproject/bioproject.trim.txt', '../Data/proc/bioproject/bioproject.0.95.proc')
+		main('../path/to/input/Biosample_Metadata_Formatted.txt', '../path/to/output/biosample.0.95.proc')
+
+
+
