@@ -62,26 +62,19 @@ As examples of the above, consider:
 # import numpy as np
 
 # Create a DataFrame with 8 unique values in column 'A'
-""" Example Usage """
 
-    df = pd.DataFrame({
-
+    """ Example Usage """
+    df = pd.DataFrame(
+    {
     'A': np.arange(1, 9),               # Unique values from 1 to 8 (bijective)
-    
     'B': np.random.permutation(np.arange(1, 9)),  # A permutation of A (bijective)
-    
     'C': [1, 2, 2, 3, 3, 3, 4, 4],       # Repeated values, not unique (neither)
-    
     'D': np.random.permutation(np.arange(1, 9)),  # Another permutation of A (bijective)
-    
     'E': [1, 1, 2, 2, 3, 3, 4, 4],       # Subset of A's values but repeated (surjective (loosely depending on true domain def))
-    
     'F': np.arange(1, 5).repeat(2)[:8],  # Unique values, partial coverage of A (injective)
-    
     'G': np.arange(100, 108),            # Completely unique set (injective)
-    
     'H': [1, 2, 3, 4, 5, 6, 7, 1]        # Duplicates but covers all A (surjective)
-    })
+    } )
     print(df)
 
 Note that we identify relationships of this kind between all pairs of columns in order to achieve greater data compression through the creation of ancillary tables.
