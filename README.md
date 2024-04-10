@@ -58,12 +58,11 @@ Bijective Function (One-to-One Correspondence): A bijective function combines th
 
 As examples of the above, consider:
 
-# import pandas as pd
-# import numpy as np
-
-# Create a DataFrame with 8 unique values in column 'A'
-
     """ Example Usage """
+    # import pandas as pd
+    # import numpy as np
+    # Create a DataFrame with 8 unique values in column 'A'
+    
     df = pd.DataFrame(
     {
     'A': np.arange(1, 9),               # Unique values from 1 to 8 (bijective)
