@@ -67,7 +67,7 @@ As examples of the above, consider:
 #     'B': np.random.permutation(np.arange(1, 9)),  # A permutation of A (bijective)
 #     'C': [1, 2, 2, 3, 3, 3, 4, 4],       # Repeated values, not unique (neither)
 #     'D': np.random.permutation(np.arange(1, 9)),  # Another permutation of A (bijective)
-#     'E': [1, 1, 2, 2, 3, 3, 4, 4],       # Subset of A's values but repeated (surjective)
+#     'E': [1, 1, 2, 2, 3, 3, 4, 4],       # Subset of A's values but repeated (surjective (loosely depending on true domain def))
 #     'F': np.arange(1, 5).repeat(2)[:8],  # Unique values, partial coverage of A (injective)
 #     'G': np.arange(100, 108),            # Completely unique set (injective)
 #     'H': [1, 2, 3, 4, 5, 6, 7, 1]        # Duplicates but covers all A (surjective)
