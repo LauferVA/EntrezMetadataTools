@@ -1,104 +1,166 @@
 import pandas as pd
+from collections import Counter
 
-def Duplicate_And_PreProcess_Db(df):
-	"""Preprocesses the DataFrame by stripping whitespace and converting to lowercase."""
-	df_processed = df.copy()
-	for col in df_processed.columns:
-		df_processed[col] = df_processed[col].str.strip().str.lower()
-	return df_processed
+def remove_sparse_columns(df):
+	""" Step 1.1 - Removes columns that have more than 95% missing values """
+	threshold = 0.95
+	return df.dropna(thresh=(1 - threshold) * len(df), axis=1)
 
-def Identify_and_Remove_Duplicate_Cols(df):
-	"""Identifies completely identical columns in a DataFrame and removes them."""
-	cols_to_drop = []
-	num_cols = len(df.columns)
-	for i in range(num_cols):
-		for j in range(i+1, num_cols):
-			if df.iloc[:, i].equals(df.iloc[:, j]):
-				cols_to_drop.append(df.columns[j])
-	df_cleaned = df.drop(columns=cols_to_drop) # Drop identified columns
-	return df_cleaned, cols_to_drop
+def standardize_data(df):
+	""" Step 1.2 - Creates a copy of the DataFrame and standardizes all text to lower case and strips whitespace """
+	for col in df.columns:
+		df[col] = df[col].apply(lambda x: x.lower().strip() if isinstance(x, str) else x)
+	return df
 
-def Identify_Primary_Key_Cols(df):
-  """ Identify the primary key by proving a column has no empty fields and is bijective unto itself. We do this simply by: 
-  1. 
-  2. Showing the number of unique values in the column considered is equivalent to the number of rows of the df 
-  - 
-  """
+def identify_primary_key_candidates(df):
+	""" Step 1.4 - Removes columns from both the original and its copy that are completely identical """
+	candidates = []
+	for col in df.columns:
+		if df[col].is_unique and df[col].notna().all():
+			candidates.append(col)
+	return candidates
 
-def Surjective_Cols_To_LookUp(df, colToKeep, colToDrop):
-	""" Following the identification of a surjective relationship, this function will write the one-to-one correspondence to a separate Df """
-	new_df = df[[colToKeep, colToDrop]]			# Create a new DF with only the two specified columns
-	new_df = new_df.fillna('')					# Convert NaN values in the new DataFrame to 0-length strings
-	new_df = new_df.drop_duplicates()			# Drop duplicates from the new DataFrame
-	modified_df = df.drop(columns=[colToDrop])	# Drop the specified column to drop from the original DataFrame
-	return modified_df, new_df					# Return both the modified original DataFrame and the new DataFrame
+def remove_identical_columns(df, df_copy):
+	"""Identifies columns that have a one-to-one relationship, useful for deduplication and data integrity."""
+	identical_cols = set()  # Use a set to prevent duplicates
+	columns = df.columns
+	identity_check = {}
+	for i in range(len(columns)):
+		for j in range(i + 1, len(columns)):
+			col1 = columns[i]
+			col2 = columns[j]
+			# Check if the columns are identical
+			identical = (df[col1] == df[col2]).all()
+			# Store the result in the dictionary
+			identity_check[(col1, col2)] = identical
+			# If columns are identical, add them to the set of columns to drop
+			if identical:
+				identical_cols.add(col2)  # Typically add the second column, or choose strategy
+
+	# Drop the identical columns from both dataframes
+	df.drop(columns=list(identical_cols), inplace=True)
+	df_copy.drop(columns=list(identical_cols), inplace=True)
+	return df, df_copy
+
 
 def identify_bijective_relationships(df):
-	""" Identify columns that map onto one another in a one-to-one fashion, even if the string differ """
-	cols_to_drop = []
-	mapping_tables=[]
+	""" Step 1.5 - Identify columns that map onto one another in a one-to-one fashion, even if the strings differ."""
 	num_cols = len(df.columns)
+	cols_to_drop = []
+	mapping_tables = []
+
+	# Precompute unique value counts and non-null unique value counts for each column
+	unique_counts = {col: df[col].dropna().unique().size for col in df.columns}
+	unique_nunique_counts = {col: df[col].dropna().nunique() for col in df.columns}
+
 	for i in range(num_cols):
-		for j in range(i+1, num_cols):
-			col_i = df.iloc[:, i]
-			col_j = df.iloc[:, j]
-			if col_i.dropna().unique().size == col_j.dropna().unique().size == col_i.dropna().nunique() == col_j.dropna().nunique() and col_i.isin(col_j).all() and col_j.isin(col_i).all():
-				cols_to_drop.append(df.columns[j])
-				mapping_tables=ColToMetaTable(cols_to_drop)
+		for j in range(i + 1, num_cols):
+			col_i_name = df.columns[i]
+			col_j_name = df.columns[j]
+			col_i = df.iloc[:, i].dropna()
+			col_j = df.iloc[:, j].dropna()
+
+			if (unique_counts[col_i_name] == unique_counts[col_j_name] ==
+				unique_nunique_counts[col_i_name] == unique_nunique_counts[col_j_name] and
+				col_i.isin(col_j).all() and col_j.isin(col_i).all()):
+				cols_to_drop.append(col_j_name)
+				mapping_table = pd.DataFrame({
+					col_i_name: col_i.unique(),
+					col_j_name: pd.Series(col_i.unique()).map(pd.Series(col_j.unique(), index=col_i.unique())).values
+				})
+				mapping_tables.append(mapping_table)
+
 	return cols_to_drop, mapping_tables
 
-# Check if every department is represented
-def identify_surjective_relationships(df):
-    # Get all column names
-    columns = df.columns
-    # Prepare a dictionary to store results for each pair
-    results = {}
-    
-    # Iterate over all pairs of columns
-    for i in range(len(columns)):
-        for j in range(len(columns)):
-            if i != j:
-                # Get column names
-                domain_col = columns[i]
-                codomain_col = columns[j]
-                # Check if all values in the codomain are covered by the domain
-                surjective = all(item in df[domain_col].unique() for item in df[codomain_col].unique())
-                # Store the result in the dictionary
-                results[(domain_col, codomain_col)] = surjective
-    
-    return results
+def Surjective_Cols_To_LookUp_Table(df, colToKeep, colToDrop):
+	""" Step 1.6 - Following identification of a surjective relationship, this function will write the one-to-one 
+	correspondence to a separate DataFrame and update the original DataFrame by dropping one column."""
+	new_df = df[[colToKeep, colToDrop]]  # Create a new DF with only the two specified columns
+	new_df = new_df.dropna().drop_duplicates()  # Remove NaN values and drop duplicates from the new DataFrame
+	modified_df = df.drop(columns=[colToDrop])  # Drop the specified column to drop from the original DataFrame
+	return modified_df, new_df  # Return both the modified original DataFrame and the new DataFrame
 
-def main():
-	# Sample data setup
-	df = pd.DataFrame({
-		'A': [' Apple ', ' Banana ', 'Citrus ', 'Apple'],
-		'B': ['apple', 'banana', 'citrus', 'apple'],
-		'C': ['1', '2', '3', '1'],
-		'D': ['one', 'two', 'three', 'one']
-	})
+def manage_bijective_and_lookup(df):
+	""" Steps 1.5 and 1.6 - Manage bijective relationships and create lookup tables"""
+	modified_df = df.copy()
+	dropped_columns, mapping_tables = identify_bijective_relationships(df)
+	for table in mapping_tables:
+		colToKeep, colToDrop = table.columns[0], table.columns[1]
+		modified_df, new_lookup_table = Surjective_Cols_To_LookUp_Table(modified_df, colToKeep, colToDrop)
+		print(f"Lookup table created for {colToKeep} and {colToDrop}")
+		print(new_lookup_table.head())  # Display a preview of the lookup table
+	return modified_df
 
-	# Identify candidates that could possibly serve as a primary key
-	dedup_df, dropped_columns = Identify_Primary_Key_Cols(df)
-	print("Dropped Columns:", dropped_columns, '\n', "De-duplicated DataFrame:\n", dedup)
+def remove_substrings_from_colnames(df, threshold_percentage=0.20):
+	# Split column names and count occurrences of each part
+	col_names = df.columns.tolist()
+	parts_list = [name.split('_') for name in col_names]
+	flat_list = [part for sublist in parts_list for part in sublist]
+	part_counts = Counter(flat_list)
+	threshold = len(col_names) * threshold_percentage / 100 # Calculate the threshold for removing a part
 
-	# Preprocess the DataFrame
-	duplicate_df = Duplicate_And_PreProcess_Db(df)
-	print("duplicate DataFrame in all lower case; all leading and trailing white spaces removed:\n", duplicate_df)
+	# Find parts that are common across more than the threshold and lead a column name
+	common_leading_parts = {part for part, count in part_counts.items() if count > threshold and
+							any(name.startswith(part + '_') for name in col_names)}
 
-	# Identify and remove duplicate columns
-	dedup_df, dropped_columns = Identify_and_Remove_Duplicate_Cols(dedup_df)
-	print("Dropped Columns:", dropped_columns, '\n', "De-duplicated DataFrame:\n", dedup)
+	# Remove the common leading parts from the column names
+	new_col_names = []
+	for name in col_names:
+		for part in common_leading_parts:
+			if name.startswith(part + '_'):
+				name = name.replace(part + '_', '', 1)  # Replace only the first occurrence
+				break  # Once the leading part is replaced, proceed to the next column name
+		new_col_names.append(name)
+	column_mapping_df = pd.DataFrame({'Full_Colnames': col_names, 'New_Colnames': new_col_names})
+	df.columns = new_col_names
+	return df, column_mapping_df
 
-	# Like Identical Columns, one of the two of a pair of bijectives can be removed as long as the mapping is stored
-	proc_df, oneToOne_columns = Bijectives_to_LookUp(processed_df)
-	print("One-to-one Columns:", oneToOne_columns, '\n', "Bijective Relationships removed to increase LookUp Speed (data footprint unchanged).\n", final_df)
+def write_outfiles(df_Out, outfile):
+	outfileXlsx=outfile + '.xlsx'
+	df_Out, column_mapping_df = remove_substrings_from_colnames(df_Out, 0.20)
+	try:
+		with pd.ExcelWriter(outfileXlsx, engine='openpyxl') as writer:
+			df_Out.to_excel(writer, sheet_name='MetaData', index=False)
+			column_mapping_df.to_excel(writer, sheet_name='ColumnMapping', index=False)
+#
+	except Exception as e:
+		print(f"Failed to write using openpyxl due to {e}. Trying xlsxwriter...")
+		try:
+			with pd.ExcelWriter(outfileXlsx, engine='xlsxwriter') as writer:
+				df_Out.to_excel(writer, sheet_name='MetaData', index=False)
+				column_mapping_df.to_excel(writer, sheet_name='ColumnMapping', index=False)
+#
+		except Exception as e:
+			print(f"Failed to write using xlsxwriter as well due to {e}. Writing .tsv instead.")   # Additional error handling or fallback logic can be implemented here
+			outfileTsv=outfile + '.tsv'
+			df_Out.to_csv(outfileTsv, sep='\t', index=False) # Write output to tsv
+			outfileColTsv=outfile + '.col_mapping.tsv'
+			column_mapping_df.to_csv(outfileColTsv, sep='\t', index=False) # Write output to tsv
 
-  # Surjective columns to LookUp Table
-  proc_df, oneToOne_columns = Surjective_Cols_To_LookUp(processed_df)
-  print("One-to-one Columns:", oneToOne_columns, '\n', "Surjective Relationships removed to decrease data footprint.\n", final_df)
+def main(infile, outfile_stem):
+	""" Step 0: Main function to load data, apply cleaning transformations, and print out the final DataFrame """
+	try:
+		df = pd.read_csv(infile, delimiter='\t', dtype=str, encoding='utf-8')
+	except UnicodeDecodeError:
+		try:
+			df = pd.read_csv(infile, delimiter='\t', dtype=str, encoding='ISO-8859-1')
+		except UnicodeDecodeError:
+			df = pd.read_csv(infile, delimiter='\t', dtype=str)  # Fallback to default encoding
 
-	# Now that the 
+	df = remove_sparse_columns(df)  # Step 1.1
+	df = standardize_data(df)  # Step 1.2
+	df_copy=df.copy()
+	df, df_copy = remove_identical_columns(df, df_copy)  # Step 1.3
+	primary_keys = identify_primary_key_candidates(df)  # Step 1.4
+	print("Primary Key Candidates:", primary_keys)
+	final_df = manage_bijective_and_lookup(df)  # Step 1.5 and 1.6
+	write_outfiles(final_df, outfile_stem)
+
+	return final_df
 
 if __name__ == "__main__":
-	main()
-
+	import sys
+	if len(sys.argv) > 1:
+		main(sys.argv[1])  # Pass the input file as an argument
+	else:
+		main('../Data/proc/bioproject/bioproject.trim.txt', '../Data/proc/bioproject/bioproject.0.95.proc')
