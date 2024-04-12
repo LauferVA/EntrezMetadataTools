@@ -34,13 +34,14 @@ Procedure 1: Pre-Merge Data-Processing of an individual table. This is, for exam
 
 Procedure 2: Once 2 Processed DFs are obtained (e.g., one from bioproject and one from biosample), we wish to merge them. In so doing, we want to
 apply many of the same principles again, though some (Step 1.1) arent needed and new steps need to be added. 
-	Step 2.1: Identify any columns that could conceivably be used to join the two tables we heavily favor the use of identity for 2.1. Not abs requirement
-	Step 2.2: Select a procedure for joining the two DBs. 
+
+    Step 2.1: Identify any columns that could conceivably be used to join the two tables we heavily favor the use of identity for 2.1. Not abs requirement
+    Step 2.2: Select a procedure for joining the two DBs. 
 		If col1 == col2 			--> inner join.
 		If col1 is a subset of col2 --> right join.
 		If col2 is a subset of col1 -->  left join.
 		Otherwise:					--> outer join.
-	Step 2.3 - 2.5: After joining, repeat steps 1.4 - 1.6
+    Step 2.3 - 2.5: After joining, repeat steps 1.4 - 1.6
 
 #####################################################################
 Terminology from Set Theory used in comments:
