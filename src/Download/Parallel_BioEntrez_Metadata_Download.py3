@@ -87,7 +87,10 @@ def fetch_summary_batch(db, id_list, retries=5, backoff=1.5):
     attempt = 0
     while attempt < retries:
         try:
-            handle = Entrez.esummary(db=db, id=",".join(id_list))
+            if db == 'gds':
+                handle = Entrez.esummary(db=db, id=",".join(id_list))
+            else:
+                handle = Entrez.efetch(db=db, id=','.join(id_list)
             records = Entrez.read(handle)
             handle.close()
             return records
