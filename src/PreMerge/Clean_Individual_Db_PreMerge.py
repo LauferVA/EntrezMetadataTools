@@ -90,6 +90,8 @@ def manage_bijective_and_lookup(df, df_copy):
 		print(new_lookup_table.head())  # Display a preview of the lookup table
 	return df
 
+"""
+This functionality has been moved to a dedicated script for the time being
 def remove_substrings_from_colnames(df, threshold_percentage=0.20):
 	""" Split column names and count occurrences of each part """
 	col_names = df.columns.tolist()
@@ -112,6 +114,7 @@ def remove_substrings_from_colnames(df, threshold_percentage=0.20):
 	column_mapping_df = pd.DataFrame({'Full_Colnames': col_names, 'New_Colnames': new_col_names})
 	df.columns = new_col_names
 	return df, column_mapping_df
+"""
 
 def write_outfiles(df_Out, outfile):
 	outfileXlsx=outfile + '.xlsx'
