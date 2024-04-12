@@ -4,9 +4,6 @@ This may be XML or other format - processing script needs to be flexible.
 Takes as input the files written by eFetchMetadataParallel.py
 """
 
-import json
-import os
-import 
 
 
 
