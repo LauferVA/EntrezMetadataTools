@@ -93,7 +93,7 @@ def manage_bijective_and_lookup(df, df_copy):
 """
 This functionality has been moved to a dedicated script for the time being
 def remove_substrings_from_colnames(df, threshold_percentage=0.20):
-	""" Split column names and count occurrences of each part """
+	# Split column names and count occurrences of each part
 	col_names = df.columns.tolist()
 	parts_list = [name.split('_') for name in col_names]
 	flat_list = [part for sublist in parts_list for part in sublist]
