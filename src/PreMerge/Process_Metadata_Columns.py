@@ -20,7 +20,7 @@ def remove_identical_columns(df, threshold=0.9):
     df = df.drop(columns=set(redundant_cols))
     return df, redundant_cols
 
-ef remove_substrings_from_colnames(df, threshold_percentage=0.20):
+def remove_substrings_from_colnames(df, threshold_percentage=0.20):
     """ Splits column names and counts occurrences of each part. """
     original_col_names = df.columns.tolist()
     df.columns = [col.lstrip('_') for col in df.columns]
