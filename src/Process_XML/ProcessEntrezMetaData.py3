@@ -4,7 +4,7 @@ from collections import defaultdict
 import os
 import csv
 
-def parse_xml_to_dict(xml_string):
+def xml_to_dict(xml_string):
     """ convert XML to dict using beautiful soup. name dict keys using the XML element and subelement 
     names in order to preserve knowledge of incoming XML """
     soup = BeautifulSoup(xml_string, 'html.parser')  # lxml is default for bs4, but this selection more likely to work for varety of users (html.parser as an alternative parser).
@@ -24,7 +24,7 @@ def process_xml_data(xml_row_data):
     xml_data = xml_row_data
     while xml_data:
         try:
-            xml_dict = parse_xml_to_dict(xml_data)
+            xml_dict = xml_to_dict(xml_data)
             final_xml_df = pd.concat([final_xml_df, pd.DataFrame(xml_dict)], ignore_index=True)
             break  # Process only the first chunk of XML data
         except Exception as e:
