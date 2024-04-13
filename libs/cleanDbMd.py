@@ -1,5 +1,6 @@
 import pandas as pd
 from collections import Counter
+import sys
 
 def remove_sparse_columns(df):
 	""" Step 1.1 - Removes columns that have more than 95% missing values """
@@ -90,10 +91,6 @@ def manage_bijective_and_lookup(df, df_copy):
 		print(new_lookup_table.head())  # Display a preview of the lookup table
 	return df
 
-
-import sys
-from collections import Counter
-
 def refine_segments(fields):
     # Lowercase and split fields
     fields = [field.lower() for field in fields]
@@ -140,7 +137,10 @@ def refine_segments(fields):
 
 
 """
-This functionality has been moved to a dedicated script for the time being
+This functionality has been replaced by the functions immediately above.
+At present it is not yet integrated into main(), below.
+"""
+"""
 def remove_substrings_from_colnames(df, threshold_percentage=0.20):
 	# Split column names and count occurrences of each part
 	col_names = df.columns.tolist()
