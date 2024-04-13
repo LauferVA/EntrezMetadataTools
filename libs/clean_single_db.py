@@ -13,8 +13,10 @@ def standardize_data(df):
 		df[col] = df[col].apply(lambda x: x.lower().strip() if isinstance(x, str) else x)
 	return df
 
-from collections import Counter
-import pandas as pd
+def remove_empty_rows(df):
+    """ drop rows that are entirely empty """ 
+    df = df.dropna(axis=1, how='all')
+    return(df)
 
 def remove_sparse_columns(df, threshold=0.95):
     """ Removes columns that have a percentage of missingness above a specified threshold. """
@@ -23,6 +25,14 @@ def remove_sparse_columns(df, threshold=0.95):
     df = df.dropna(axis=1, thresh=min_count)
     removed_columns = original_columns - set(df.columns)
     return df, list(removed_columns)
+
+def identify_primary_key_candidates(df):
+	""" Step 1.4 - Removes columns from both the original and its copy that are completely identical """
+	candidates = []
+	for col in df.columns:
+		if df[col].is_unique and df[col].notna().all():
+			candidates.append(col)
+	return candidates
 
 def remove_identical_columns(df, threshold=0.9):
     """ Removes columns that have a percentage of identity above a specified threshold. """
@@ -34,17 +44,6 @@ def remove_identical_columns(df, threshold=0.9):
                 redundant_cols.append(columns[j])
     df = df.drop(columns=set(redundant_cols))
     return df, redundant_cols
-
-
-
-
-def identify_primary_key_candidates(df):
-	""" Step 1.4 - Removes columns from both the original and its copy that are completely identical """
-	candidates = []
-	for col in df.columns:
-		if df[col].is_unique and df[col].notna().all():
-			candidates.append(col)
-	return candidates
 
 def remove_identical_columns(df, df_copy):
 	"""Identifies columns that have a one-to-one relationship, useful for deduplication and data integrity."""
