@@ -103,7 +103,7 @@ def surjective_cols_to_lookup_table(df, df_copy, colToKeep, colToDrop):
 	correspondence to a separate DataFrame and update the original DataFrame by dropping one column."""
 	lookup_df = df[[colToKeep, colToDrop]]       # Create a new DF with only the two specified columns
 	df_copy = df_copy.dropna().drop_duplicates() # Remove NaN values and drop duplicates from the new DataFrame
-	df_copy = df_copy.drop(columns=[colToDrop])  # Drop the specified column to drop from the original DataFrame
+	df_copy = df_copy.drop(columns=[colToDrop])  # Drop the specified column to drop from the DataFrame copy
 	df = df.drop(columns=[colToDrop])            # Now finally drop the specified columns to drop from the **original** DataFrame
 	return df, df_copy, lookup_df                # Return both the modified original DataFrame and the new DataFrame
 
