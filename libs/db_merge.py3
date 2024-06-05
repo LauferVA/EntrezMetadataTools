@@ -60,34 +60,55 @@ def match_key_candidate_contents(df1, primary_keys1, df2, primary_keys2):
 
     return match_percentages
 
-""" Run Steps 1 and 2 """
-def main(file1, file2):
-    # Load the data from the input files into pandas DataFrames
-    df1 = pd.read_csv(file1)
-    df2 = pd.read_csv(file2)
+def main(file_list, outfile):
+    # Initialize an empty DataFrame for merging
+    merged_df = pd.DataFrame()
 
-    # Identify primary key candidates and percentage data for both DataFrames
-    primary_keys1, percentages1 = identify_candidate_primary_keys(df1)
-    primary_keys2, percentages2 = identify_candidate_primary_keys(df2)
+    # Iterate over pairs of files in the list
+    for i in range(len(file_list) - 1):
+        file1 = file_list[i]
+        file2 = file_list[i + 1]
+        
+        # Load the data from the input files into pandas DataFrames
+        df1 = pd.read_csv(file1)
+        df2 = pd.read_csv(file2)
+        
+        # Identify primary key candidates and percentage data for both DataFrames
+        primary_keys1, percentages1 = identify_candidate_primary_keys(df1)
+        primary_keys2, percentages2 = identify_candidate_primary_keys(df2)
+        
+        # Match the contents of the potential primary keys between both DataFrames
+        matches = match_key_candidate_contents(df1, primary_keys1, df2, primary_keys2)
+        
+        # Merge the DataFrames based on the identified primary keys
+        merged_df = df1.merge(df2, on=matches.keys(), how='outer') if merged_df.empty else merged_df.merge(df2, on=matches.keys(), how='outer')
 
-    # Match the contents of the potential primary keys between both DataFrames
-    matches = match_key_candidate_contents(df1, primary_keys1, df2, primary_keys2)
+        # Print the match percentages
+        print("Match Percentages:")
+        for keys, percentage in matches.items():
+            print(f"{keys}: {percentage}%")
+    
+    # Save the final merged DataFrame to the output file
+    merged_df.to_csv(outfile, index=False)
 
-    # Print the match percentages
-    print("Match Percentages:")
-    for keys, percentage in matches.items():
-        print(f"{keys}: {percentage}%")
-
-""" File names, which are also input args """
+""" Optionally, specify file names rather than system arguments as the input files """
 inDir='/data/user/vlaufer/DeathStar/Data/merge'
-file1=f'{inDir}/biosamples.proc.tsv'
-file2=f'{inDir}/bioprojects.proc.tsv'
+# file1=f'{inDir}/biosamples.proc.tsv'
+# file2=f'{inDir}/bioprojects.proc.tsv'
 outfile=f'{inDir}/merge.proc.tsv'
 
-""" Examples of ways to call the main function: """
-if len(sys.argv) > 2:
-	main(sys.argv[1], sys.argv[2], sys.argv[3])
-else:
-	main(file1, file2, outfile)
+if __name__ == '__main__':
+    inDir = '/data/user/vlaufer/DeathStar/Data/merge'
+    file_list = [
+        f'{inDir}/biosamples.proc.tsv',
+        f'{inDir}/bioprojects.proc.tsv',
+        # Add more files as needed
+    ]
+    outfile = f'{inDir}/merge.proc.tsv'
 
+    # Use sys.argv if arguments are provided, else use the default file_list
+    if len(sys.argv) > 1:
+        file_list = sys.argv[1:]
+    
+    main(file_list, outfile)
 
