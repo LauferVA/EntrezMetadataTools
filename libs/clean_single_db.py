@@ -34,6 +34,7 @@ def identify_primary_key_candidates(df):
 			candidates.append(col)
 	return candidates
 
+"""
 def remove_identical_columns(df, threshold=0.9):
     """ Removes columns that have a percentage of identity above a specified threshold. """
     columns = df.columns.tolist()
@@ -44,6 +45,7 @@ def remove_identical_columns(df, threshold=0.9):
                 redundant_cols.append(columns[j])
     df = df.drop(columns=set(redundant_cols))
     return df, redundant_cols
+"""
 
 def remove_identical_columns(df, df_copy):
 	"""Identifies columns that have a one-to-one relationship, useful for deduplication and data integrity."""
@@ -177,9 +179,6 @@ def main():
     # Output the final unique fields
     for field in refined_fields:
         print(field)
-
-if __name__ == "__main__":
-    main()
 
 """
 def main():
