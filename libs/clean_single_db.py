@@ -180,7 +180,6 @@ def main():
     for field in refined_fields:
         print(field)
 
-"""
 def main():
     dbIn = '/data/user/vlaufer/DeathStar/Data/proc/sra/sra_db_pre_proc.tsv'
     dbOut = '/data/user/vlaufer/DeathStar/Data/proc/sra/sra_db_processed.tsv'
@@ -201,4 +200,4 @@ def main():
     except Exception as e:
         print(f"An error occurred: {e}")
 
-main()
+"""
